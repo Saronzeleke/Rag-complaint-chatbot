@@ -8,7 +8,6 @@ import pandas as pd
 import re
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 import faiss
 import pickle
 import gradio as gr
@@ -16,12 +15,12 @@ import gradio as gr
 # ----------------------------
 # CONFIGURATION
 # ----------------------------
-INPUT_PATH = r"C:\Users\admin\Rag-complaint-chatbot\data\raw\full_complaints.csv"
+INPUT_PATH = r"C:\Users\admin\Rag-complaint-chatbot\data\raw\complaints.csv"
 FILTERED_PATH = r"C:\Users\admin\Rag-complaint-chatbot\data\filtered_complaints.csv"
 VECTOR_STORE_DIR = Path("vector_store")
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
-SAMPLE_SIZE = 50000  # can adjust to 10k-50k
+SAMPLE_SIZE = 50000  # adjust to 10k-50k
 TOP_K = 5  # top-k retrieval
 
 PRODUCTS_TO_KEEP = [
@@ -51,6 +50,16 @@ def clean_text(text: str) -> str:
     text = re.sub(r"[^a-z0-9\s]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+def chunk_text(text: str, chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP):
+    """Split text into overlapping chunks (characters)."""
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        chunks.append(text[start:end])
+        start += chunk_size - chunk_overlap
+    return chunks
 
 def load_and_filter_dataset(input_path: str) -> pd.DataFrame:
     """Load large CSV in chunks, filter products, remove empty narratives, clean text."""
@@ -89,16 +98,11 @@ print(f"Filtered dataset saved to: {FILTERED_PATH}")
 # TASK 2: Chunking & Embeddings
 # ----------------------------
 print("[Task 2] Splitting text into chunks...")
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=CHUNK_SIZE,
-    chunk_overlap=CHUNK_OVERLAP
-)
-
 all_chunks = []
 all_metadata = []
 
 for idx, row in df_sample.iterrows():
-    chunks = text_splitter.split_text(row['Consumer complaint narrative'])
+    chunks = chunk_text(row['Consumer complaint narrative'], CHUNK_SIZE, CHUNK_OVERLAP)
     all_chunks.extend(chunks)
     all_metadata.extend([{
         'complaint_id': row.get('Complaint ID', idx),

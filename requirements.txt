@@ -35,3 +35,4 @@ python-dotenv>=1.0.0
 openai>=0.28.0
 transformers>=4.30.0
 torch>=2.0.0
+nltk

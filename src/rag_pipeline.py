@@ -1,4 +1,3 @@
-# src/rag_pipeline.py
 import pandas as pd
 import numpy as np
 import os
@@ -124,7 +123,7 @@ class RAGPipeline:
         # Create retriever
         self.retriever = self.vector_store.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": 5}  # Retrieve top 5 chunks
+            search_kwargs={"k": 5}  
         )
         
         print(f"Vector store loaded with {self.vector_store.index.ntotal if hasattr(self.vector_store, 'index') else 'unknown'} vectors")
@@ -172,7 +171,6 @@ class RAGPipeline:
                 print("Falling back to dummy LLM for testing")
                 self.llm = self._dummy_llm
         else:
-            # For production, you would load a more powerful model
             # This is a placeholder for actual LLM initialization
             print("Using production LLM configuration")
             self.llm = None
@@ -379,7 +377,7 @@ Answer as a financial analyst:"""
             # Run RAG pipeline
             result = self.run_rag_pipeline(question)
             
-            # Manual quality assessment (in practice, this would be done by human evaluators)
+            
             # For this implementation, we'll use a simple heuristic
             quality_score = self._assess_quality(result)
             
@@ -410,7 +408,7 @@ Answer as a financial analyst:"""
         
         # Save evaluation results
         os.makedirs('data/processed', exist_ok=True)
-        evaluation_df.to_csv('data/processed/rag_evaluation.csv', index=False)
+        evaluation_df.to_csv(r'C:/Users/admin/Rag-complaint-chatbot/data/processed/rag_evaluation.csv', index=False)
         
         # Generate summary statistics
         self._generate_evaluation_summary(evaluation_df)
@@ -436,9 +434,9 @@ Answer as a financial analyst:"""
         # Check if answer acknowledges lack of information
         if "don't have enough information" in answer or "no relevant information" in answer:
             if not contexts:
-                score = 4  # Honest about lack of info
+                score = 4  
             else:
-                score = 2  # Has context but still says no info
+                score = 2  
         else:
             # Check answer relevance
             if contexts:
@@ -525,14 +523,14 @@ Answer as a financial analyst:"""
             "embedding_model": self.embedding_model_name
         }
         
-        summary_path = 'data/processed/evaluation_summary.json'
+        summary_path = r'C:\Users\admin\Rag-complaint-chatbot\data\processed\evaluation_summary.json'
         with open(summary_path, 'w') as f:
             json.dump(summary, f, indent=2)
         
         print(f"\nDetailed evaluation saved to: data/processed/rag_evaluation.csv")
         print(f"Summary saved to: {summary_path}")
     
-    def save_evaluation_report(self, output_path: str = 'data/processed/rag_evaluation_report.md'):
+    def save_evaluation_report(self, output_path: str = r'C:\Users\admin\Rag-complaint-chatbot\data\processed\rag_evaluation_report.md'):
         """
         Save evaluation report in Markdown format
         

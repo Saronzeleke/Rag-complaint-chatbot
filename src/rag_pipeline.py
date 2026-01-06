@@ -11,21 +11,32 @@ import sys
 
 # Import required libraries
 try:
-    from langchain.embeddings import HuggingFaceEmbeddings
-    from langchain.vectorstores import FAISS, Chroma
-    from langchain.chains import RetrievalQA
-    from langchain.prompts import PromptTemplate
-    from langchain.llms import HuggingFacePipeline
-    from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-    from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
-    import torch
-    from sentence_transformers import SentenceTransformer
-    import faiss
-except ImportError as e:
-    print(f"Error importing required libraries: {e}")
-    print("Please install required packages: pip install -r requirements.txt")
+    # -------------------- LangChain (CORRECT) --------------------
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_community.vectorstores import FAISS, Chroma
+    from langchain_community.llms import HuggingFacePipeline
 
+    from langchain_core.prompts import PromptTemplate
+    from langchain_core.callbacks import StreamingStdOutCallbackHandler
+
+    from langchain.chains.retrieval_qa.base import RetrievalQA
+    # ------------------------------------------------------------
+
+    # Transformers / ML
+    from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+    from sentence_transformers import SentenceTransformer
+    import torch
+    import faiss
+
+except ImportError as e:
+    raise ImportError(
+        f"Missing dependency: {e}\n"
+        "Fix your environment:\n"
+        "pip install langchain langchain-core langchain-community "
+        "transformers torch sentence-transformers faiss-cpu"
+    )
 warnings.filterwarnings('ignore')
+
 
 class RAGPipeline:
     """RAG Pipeline for complaint analysis"""
@@ -150,6 +161,7 @@ class RAGPipeline:
                     self.llm = pipeline(
                         "text-generation",
                         model="microsoft/DialoGPT-small",
+                        max_length=500,
                         max_new_tokens=200,
                         temperature=0.7,
                         do_sample=True
@@ -160,6 +172,7 @@ class RAGPipeline:
                     self.llm = pipeline(
                         "text-generation",
                         model="gpt2",
+                        max_length=500,
                         max_new_tokens=200,
                         temperature=0.7,
                         do_sample=True
@@ -176,6 +189,7 @@ class RAGPipeline:
             self.llm = None
         
         return self.llm
+    
     
     def _dummy_llm(self, prompt: str, **kwargs) -> str:
         """Dummy LLM for testing when real LLM is not available"""
@@ -255,37 +269,41 @@ Answer as a financial analyst:"""
     def generate_answer(self, question: str, contexts: List[str]) -> str:
         """
         Generate answer using LLM
-        
-        Args:
-            question: User question
-            contexts: Retrieved contexts
-            
-        Returns:
-            Generated answer
         """
-        # Format context
         context_str = self.format_context(contexts)
-        
-        # Create prompt
         prompt_template = self.create_prompt_template()
         prompt = prompt_template.format(context=context_str, question=question)
-        
-        # Generate answer
-        if callable(self.llm):
-            # For dummy LLM or pipeline
-            if hasattr(self.llm, '__call__') and self.llm.__name__ == '_dummy_llm':
-                response = self.llm(prompt)
+
+        # Handle different LLM types robustly
+        if self.llm is None:
+            return "LLM not initialized."
+
+        # Check if it's the dummy LLM (a bound method or function)
+        if callable(self.llm) and getattr(self.llm, '__name__', '') == '_dummy_llm':
+            return self.llm(prompt)
+
+        # Handle HuggingFace pipeline
+        try:
+            outputs = self.llm(
+                prompt,
+                max_length=500,
+                num_return_sequences=1,
+                truncation=True,
+                pad_token_id=50256
+            )
+            full_text = outputs[0]['generated_text']
+
+            # Extract answer after the prompt
+            if 'Answer as a financial analyst:' in full_text:
+                answer = full_text.split('Answer as a financial analyst:')[-1].strip()
             else:
-                # For transformers pipeline
-                result = self.llm(prompt, max_length=500, num_return_sequences=1)
-                response = result[0]['generated_text'].split('Answer as a financial analyst:')[-1].strip()
-        else:
-            # Fallback if no LLM
-            response = f"Based on the context, I would analyze the complaints about {question}. "
-            response += "For specific details, please refer to the retrieved complaint excerpts."
-        
-        return response
-    
+                answer = full_text.replace(prompt, "").strip()
+
+            return answer if answer else "No answer generated."
+
+        except Exception as e:
+            return f"Error generating answer: {str(e)}"
+
     def run_rag_pipeline(self, question: str, k: int = 5) -> Dict[str, Any]:
         """
         Run complete RAG pipeline
@@ -376,7 +394,6 @@ Answer as a financial analyst:"""
             
             # Run RAG pipeline
             result = self.run_rag_pipeline(question)
-            
             
             # For this implementation, we'll use a simple heuristic
             quality_score = self._assess_quality(result)
@@ -616,6 +633,7 @@ Answer as a financial analyst:"""
         for line in report_lines[:15]:
             print(line)
 
+
 def main():
     """Main execution function for Task 3"""
     print("="*80)
@@ -677,6 +695,7 @@ def main():
     print("-" * 120)
     print(evaluation_df[['Question', 'Quality Score', 'Retrieval Score']].head().to_string())
     print("-" * 120)
+
 
 if __name__ == "__main__":
     main()
